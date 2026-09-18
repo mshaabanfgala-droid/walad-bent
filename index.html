@@ -2,334 +2,242 @@
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>ولد بنت - لعب جماعي</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ولد بنت — أونلاين</title>
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <style>
-*{box-sizing:border-box}body{margin:0;background:#f4f4f4;color:#171717;font-family:system-ui,-apple-system,"Segoe UI",Tahoma,Arial,sans-serif}
-main{max-width:650px;margin:auto;padding:16px}.card{background:#fff;border:1px solid #ddd;border-radius:18px;padding:16px;margin:12px 0}
-h1,h2,h3{margin:4px 0 10px}.muted{color:#666;font-size:14px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-input{width:100%;padding:13px;border:1px solid #ccc;border-radius:11px;font-size:16px;background:#fff}
-button{width:100%;padding:14px;border:0;border-radius:12px;font-size:17px;font-weight:800;background:#222;color:#fff;margin-top:10px}
-button.alt{background:#eee;color:#222}.stop{background:#b00020}.hidden{display:none!important}
-.big{font-size:70px;font-weight:900;text-align:center}.timer{text-align:center;font-size:21px;font-weight:800}
-.status{padding:10px;border-radius:12px;background:#f0f0f0;margin-top:10px}.ok{background:#e8f5e9}.players{display:grid;gap:8px}.person{padding:10px;border:1px solid #ddd;border-radius:12px;display:flex;justify-content:space-between}
-.fields{display:grid;grid-template-columns:1fr 1fr;gap:9px}.label{font-size:13px;font-weight:700}.label input{margin-top:4px}
-.result{padding:12px;border:1px solid #ddd;border-radius:14px;margin:8px 0}.room{font-size:28px;font-weight:900;text-align:center;letter-spacing:3px}
-@media(max-width:380px){.grid,.fields{grid-template-columns:1fr}}
+*{box-sizing:border-box}body{margin:0;background:#f5f5f5;font-family:Arial,Tahoma,sans-serif;color:#222}
+main{max-width:700px;margin:auto;padding:15px}.card{background:#fff;border:1px solid #ddd;border-radius:18px;padding:18px;margin:12px 0}
+h1,h2,h3{margin:5px 0 12px}.muted{color:#666}.status{padding:11px;border-radius:12px;background:#f0f0f0;margin:10px 0}
+.good{background:#eaf7ed}.bad{background:#fff0f0}.big{text-align:center;font-size:64px;font-weight:900;margin:8px}
+input{width:100%;padding:14px;border:1px solid #ccc;border-radius:12px;font-size:18px;margin:6px 0}
+button{width:100%;padding:14px;border:0;border-radius:12px;background:#222;color:#fff;font-size:18px;font-weight:700;margin-top:8px}
+button:disabled{opacity:.45}.alt{background:#eee;color:#222}.fields{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.field label{display:block;font-weight:700}.players div{padding:9px;border-bottom:1px solid #eee}
+.review{border:1px solid #ddd;border-radius:14px;padding:12px;margin:10px 0}.review h3{margin-bottom:6px}
+.answer{padding:10px;background:#f7f7f7;border-radius:10px;margin:6px 0}.voteRow{display:flex;gap:8px}
+.voteRow button{margin:0;flex:1}.yes{background:#267a3d}.no{background:#a52b2b}
+.points{font-size:24px;font-weight:900}.result{padding:13px;border:1px solid #ddd;border-radius:14px;margin:9px 0}
+.small{font-size:14px}@media(max-width:430px){.fields{grid-template-columns:1fr}.big{font-size:52px}}
 </style>
 </head>
-<body>
-<main>
-<section id="home">
-<h1>🎮 ولد بنت — أونلاين</h1>
-<p class="muted">كل لاعب يستخدم موبايله. شخص واحد ينشئ الغرفة ويرسل الكود للباقي.</p>
-<div class="card">
-<h2>👑 إنشاء لعبة</h2>
-<input id="hostName" placeholder="اسمك">
-<button id="create">إنشاء غرفة</button>
-</div>
-<div class="card">
-<h2>👤 دخول لعبة</h2>
-<input id="joinName" placeholder="اسمك">
-<input id="roomCode" placeholder="كود الغرفة" style="margin-top:8px;text-transform:uppercase">
-<p id="inviteHint" class="muted" style="margin:8px 0 0">لو فتحت رابط دعوة، كود الغرفة هيظهر تلقائيًا هنا.</p>
-<button id="join">دخول الغرفة</button>
-</div>
-<div id="homeStatus" class="status">يجب أن يكون كل الموبايلات متصلة بالإنترنت.</div>
-</section>
-
-<section id="lobby" class="hidden">
-<div class="card">
-<h2>غرفة اللعبة</h2>
-<div class="room" id="room"></div>
-<p class="muted" style="text-align:center">ابعت الكود ده لباقي أفراد الأسرة.</p>
-<div id="lobbyStatus" class="status">في انتظار اللاعبين...</div>
-<button id="share" class="alt">🔗 مشاركة رابط الغرفة</button>
-</div>
-<div class="card">
-<h3>👥 اللاعبين</h3>
-<div id="people" class="players"></div>
-<button id="start" class="hidden">ابدأ الجولة الأولى</button>
-</div>
-</section>
-
-<section id="play" class="hidden">
-<div class="card">
-<div id="round" style="font-weight:900"></div>
-<div class="big" id="letter">؟</div>
-<div class="timer" id="timer">120 ثانية</div>
-</div>
-<div id="myFields"></div>
-<button id="stop" class="stop" disabled>🛑 استوب — أنا خلصت</button>
-<div id="playStatus" class="status">لازم تملأ كل الخانات الستة قبل الضغط على استوب.</div>
-</section>
-
-<section id="waiting" class="hidden">
-<div class="card">
-<h2>🛑 الجولة توقفت</h2>
-<p id="waitingText">تم إيقاف الجولة. انتظر ظهور النتيجة.</p>
-<div id="submitted" class="status">جاري تجميع الإجابات...</div>
-</div>
-</section>
-
-<section id="results" class="hidden">
-<h2>🏆 نتيجة الجولة</h2>
-<div id="roundResults"></div>
-<button id="next">الجولة التالية ➜</button>
-</section>
-
-<section id="final" class="hidden">
-<h2>🏆 النتيجة النهائية</h2>
-<div id="finalResults"></div>
-<button class="alt" id="again">لعبة جديدة</button>
-</section>
-</main>
-
+<body><main><h1>🎮 ولد بنت — أونلاين</h1><div id="app"></div></main>
 <script>
-(function(){
-const cats=["ولد","بنت","حيوان","جماد","دولة","نبات"];
-const letters=["ا","ب","ت","ج","ح","خ","د","ذ","ر","ز","س","ش","ص","ض","ط","ظ","ع","غ","ف","ق","ك","ل","م","ن","ه","و","ي"];
-let peer=null, conn=null, isHost=false, myName="", roomId="", peers={}, players=[], scores={}, round=0, currentLetter="", timer=null, seconds=120, locked=false, answers={}, stopRequested=false;
+const CATS=[["ولد","boy"],["بنت","girl"],["حيوان","animal"],["جماد","object"],["دولة","country"],["نبات","plant"]];
+const LETTERS=["ا","ب","ت","ث","ج","ح","خ","د","ذ","ر","ز","س","ش","ص","ض","ط","ظ","ع","غ","ف","ق","ك","ل","م","ن","ه","و","ي"];
+const MAX=6, ROUND_SECONDS=120, TOTAL_ROUNDS=5;
+let peer=null,myId="",hostId="",hostConn=null,isHost=false,room="",name="";
+let phase="lobby",round=0,letter="",timerEnd=0,timerInt=null;
+let players={},answers={},scores={},votes={};
 
-const $=id=>document.getElementById(id);
-function show(id){["home","lobby","play","waiting","results","final"].forEach(x=>$(x).classList.toggle("hidden",x!==id));}
-function esc(s){return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));}
-function code(){return Math.random().toString(36).slice(2,7).toUpperCase();}
-function setStatus(id,t,ok=false){$(id).textContent=t;$(id).className="status"+(ok?" ok":"");}
-function renderPeople(){
- $("people").innerHTML=players.map((p,i)=>'<div class="person"><span>👤 '+esc(p.name)+'</span><span>'+(p.connected?"🟢":"⚪")+'</span></div>').join("");
+const app=document.getElementById("app");
+const params=new URLSearchParams(location.search);
+const linkRoom=(params.get("room")||"").toUpperCase(), linkHost=params.get("host")||"";
+
+function esc(s){return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));}
+function n(s){return String(s||"").trim().replace(/\s+/g," ").toLowerCase();}
+function firstLetter(s){s=String(s||"").trim();if(!s)return"";if("أإآ".includes(s[0]))return"ا";return s[0];}
+function valid(v){return n(v)!="" && firstLetter(v)===letter;}
+function emptyAnswers(){return {boy:"",girl:"",animal:"",object:"",country:"",plant:""};}
+function filled(a){return CATS.every(x=>n(a[x[1]]));}
+function timeText(ms){let s=Math.max(0,Math.ceil(ms/1000)),m=Math.floor(s/60),z=s%60;return String(m).padStart(2,"0")+":"+String(z).padStart(2,"0");}
+
+function lobby(msg=""){
+app.innerHTML=`<div class="card"><h2>👑 إنشاء لعبة</h2><input id="cn" placeholder="اسمك"><button id="cb">إنشاء غرفة</button></div>
+<div class="card"><h2>👤 دخول لعبة</h2><input id="jn" placeholder="اسمك"><input id="rc" placeholder="كود الغرفة" value="${esc(linkRoom)}">
+<div class="muted small">لو فتحت رابط دعوة، الكود يظهر تلقائيًا.</div><button id="jb">دخول الغرفة</button></div>
+${msg?`<div class="status bad">${esc(msg)}</div>`:""}`;
+document.getElementById("cb").onclick=createRoom;document.getElementById("jb").onclick=joinRoom;
 }
-function addHostPlayer(){
- players=[{id:"host",name:myName,connected:true}];scores[myName]=0;renderPeople();
+function makePeer(cb){
+peer=new Peer();
+peer.on("open",id=>{myId=id;cb();});
+peer.on("error",e=>{let t=e?.type||"network"; if(phase==="lobby") lobby("تعذر الاتصال: "+t);});
+peer.on("disconnected",()=>{try{peer.reconnect()}catch(e){}});
 }
-function createHost(){
- if(typeof Peer==="undefined"){setStatus("homeStatus","تعذر تحميل خدمة الاتصال. افتح الملف مع وجود إنترنت ثم حاول مرة أخرى.");return}
- myName=$("hostName").value.trim()||"المضيف";
- isHost=true;roomId=code();
- peer=new Peer("WB-"+roomId,{host:"0.peerjs.com",port:443,path:"/",secure:true,debug:0,pingInterval:5000,config:{iceServers:[{urls:"stun:stun.l.google.com:19302"}],sdpSemantics:"unified-plan"}});
- peer.on("open",()=>{addHostPlayer();$("room").textContent=roomId;show("lobby");setStatus("lobbyStatus","الغرفة جاهزة. استخدم زر مشاركة الرابط لإرسال الدعوة.","ok");$("start").classList.remove("hidden");});
- peer.on("connection",c=>{
-   peers[c.peer]=c;
-   c.on("open",()=>{peers[c.peer]=c;});
-   c.on("data",data=>hostMessage(c,data));
-   c.on("error",()=>{});
-   c.on("close",()=>{const p=players.find(x=>x.id===c.peer);if(p)p.connected=false;renderPeople();broadcast({type:"players",players});});
- });
- peer.on("disconnected",()=>{
-   setStatus("lobbyStatus","الاتصال بخادم اللعبة انقطع مؤقتًا… جاري إعادة الاتصال.");
-   setTimeout(()=>{try{if(peer&&!peer.destroyed)peer.reconnect()}catch(e){}},800);
- });
- peer.on("error",e=>{
-   if(e.type==="network"||e.type==="socket-closed"||e.type==="socket-error"||e.type==="disconnected"){
-     setStatus("lobbyStatus","الاتصال انقطع مؤقتًا… جاري إعادة الاتصال.");
-     setTimeout(()=>{try{if(peer&&!peer.destroyed&&!peer.open)peer.reconnect()}catch(x){}},1000);
-   }else if(e.type==="unavailable-id"){
-     setStatus("lobbyStatus","كود الغرفة مستخدم بالفعل. اضغط إعادة تحميل وأنشئ غرفة جديدة.");
-   }else{
-     setStatus("lobbyStatus","حصل خطأ في الاتصال: "+e.type);
-   }
- });
+function createRoom(){
+name=document.getElementById("cn").value.trim();if(!name)return alert("اكتب اسمك.");
+isHost=true;room=Math.random().toString(36).slice(2,7).toUpperCase();hostId="";
+players={};scores={};round=0;phase="lobby";
+makePeer(()=>{hostId=myId;players[myId]={id:myId,name,answers:emptyAnswers(),stopped:false,conn:null};renderHostLobby();});
 }
-function hostMessage(c,d){
- if(d.type==="join"){
-   if(players.length>=6){c.send({type:"full"});return}
-   const p={id:c.peer,name:d.name||"لاعب",connected:true};players.push(p);scores[p.name]=0;peers[c.peer]=c;
-   c.send({type:"joined",room:roomId,players});broadcast({type:"players",players});
-   renderPeople();
- }else if(d.type==="stop"){
-   const id=d.id||c.peer;
-   if(d.vals) answers[id]={name:d.name||players.find(x=>x.id===id)?.name||"لاعب",vals:d.vals};
-   hostStop(id);
- }
- else if(d.type==="answers"){answers[d.id]={name:d.name,vals:d.vals};}
+function joinRoom(){
+name=document.getElementById("jn").value.trim();room=document.getElementById("rc").value.trim().toUpperCase();
+hostId=linkHost;if(!name)return alert("اكتب اسمك.");if(!room)return alert("اكتب كود الغرفة.");if(!hostId)return lobby("رابط الدعوة غير كامل. استخدم زر مشاركة رابط الغرفة.");
+isHost=false;phase="lobby";makePeer(()=>{
+hostConn=peer.connect(hostId,{reliable:true});
+hostConn.on("open",()=>{hostConn.send({type:"JOIN",id:myId,name});renderJoinLobby("تم الاتصال بالغرفة.");});
+hostConn.on("data",handle);hostConn.on("close",()=>{if(phase!=="results")renderJoinLobby("انقطع الاتصال بصاحب الغرفة.");});
+});
 }
-function broadcast(msg){Object.values(peers).forEach(c=>{try{c.send(msg)}catch(e){}});}
+function renderHostLobby(msg=""){
+app.innerHTML=`<div class="card"><h2>🏠 غرفة اللعبة</h2><div class="big" style="font-size:46px">${room}</div>
+<div class="status good">${esc(msg||"الغرفة جاهزة. ابعت رابط الدعوة.")}</div><button id="share">🔗 مشاركة رابط الغرفة</button></div>
+<div class="card"><h2>👥 اللاعبين (${Object.keys(players).length}/${MAX})</h2><div class="players">${Object.values(players).map(p=>`<div>🟢 ${esc(p.name)}</div>`).join("")}</div>
+<button id="start" ${Object.keys(players).length<1?"disabled":""}>ابدأ الجولة الأولى</button></div>`;
+document.getElementById("share").onclick=share;document.getElementById("start").onclick=startRound;
+}
+function renderJoinLobby(msg=""){
+app.innerHTML=`<div class="card"><h2>🏠 الغرفة: ${esc(room)}</h2><div class="status good">${esc(msg)}</div></div>
+<div class="card"><h2>👥 اللاعبين</h2><div class="players">${Object.values(players).map(p=>`<div>🟢 ${esc(p.name)}</div>`).join("")}</div></div>`;
+}
+async function share(){
+let url=location.origin+location.pathname+"?room="+encodeURIComponent(room)+"&host="+encodeURIComponent(hostId);
+if(navigator.share){try{await navigator.share({title:"ولد بنت",text:"ادخل لعبة ولد بنت من الرابط ده",url});return}catch(e){}}
+try{await navigator.clipboard.writeText(url);alert("تم نسخ رابط الغرفة.");}catch(e){prompt("انسخ الرابط:",url);}
+}
+function broadcast(m){Object.values(players).forEach(p=>{if(p.conn?.open)p.conn.send(m);});}
+function send(m){if(hostConn?.open)hostConn.send(m);}
+
 function startRound(){
- round++;currentLetter=letters[Math.floor(Math.random()*letters.length)];seconds=120;locked=false;answers={};stopRequested=false;
- const msg={type:"round",round,letter:currentLetter,seconds};
- broadcast(msg);showPlay(msg);startClock();
+if(!isHost)return;round++;letter=LETTERS[Math.floor(Math.random()*LETTERS.length)];
+phase="play";timerEnd=Date.now()+ROUND_SECONDS*1000;answers=emptyAnswers();votes={};
+Object.values(players).forEach(p=>{p.answers=emptyAnswers();p.stopped=false;});
+renderPlay();broadcast({type:"START",round,letter,timerEnd});startTimer();
 }
-function showPlay(msg){
- $("round").textContent="الجولة "+msg.round+" من 5";
- $("letter").textContent=msg.letter;$("timer").textContent=msg.seconds+" ثانية";
- $("myFields").innerHTML=cats.map(c=>'<label class="label">'+c+'<input data-cat="'+c+'" autocomplete="off"></label>').join("");
- $("stop").disabled=true;
- $("myFields").querySelectorAll("input").forEach(x=>x.addEventListener("input",()=>{updateStopButton(); syncMyAnswers();}));
- setStatus("playStatus","لازم تملأ كل الخانات الستة قبل الضغط على استوب.");show("play");updateStopButton();
+function startTimer(){
+clearInterval(timerInt);timerInt=setInterval(()=>{
+let left=Math.max(0,timerEnd-Date.now());let el=document.getElementById("timer");if(el)el.textContent=timeText(left);
+if(left<=0){clearInterval(timerInt);if(isHost)beginReview("انتهى الوقت");}
+},200);
 }
-function startClock(){
- clearInterval(timer);timer=setInterval(()=>{seconds--; $("timer").textContent=seconds+" ثانية"; if(seconds<=0){ clearInterval(timer); if(isHost){ syncMyAnswers(); hostStop("timer"); } else { syncMyAnswers(); locked=true; if(conn&&conn.open)try{conn.send({type:"stop",id:conn.peer,name:myName,vals:collectMyAnswers()});}catch(e){} show("waiting"); } }},1000);
+function renderPlay(){
+app.innerHTML=`<div class="card"><div>الجولة ${round} من ${TOTAL_ROUNDS}</div><div class="big">${esc(letter)}</div>
+<div id="timer" class="status" style="text-align:center;font-size:30px;font-weight:900">${timeText(timerEnd-Date.now())}</div>
+<div class="status">أول لاعب يملأ الـ6 خانات يضغط استوب.</div></div>
+<div class="card"><div class="fields">${CATS.map(c=>`<div class="field"><label>${c[0]}</label><input data-k="${c[1]}" placeholder="${c[0]}"></div>`).join("")}</div>
+<button id="stop" class="alt" disabled>🛑 استوب</button></div>`;
+document.querySelectorAll("[data-k]").forEach(i=>i.oninput=()=>{
+answers[i.dataset.k]=i.value;document.getElementById("stop").disabled=!filled(answers);
+if(isHost){players[myId].answers={...answers};}else send({type:"SYNC",from:myId,answers:{...answers}});
+});
+document.getElementById("stop").onclick=()=>{
+if(!filled(answers))return;
+if(isHost){players[myId].answers={...answers};players[myId].stopped=true;beginReview("استوب");}
+else send({type:"STOP",from:myId,answers:{...answers}});
+};
 }
-function hostStop(who){
- if(!isHost||locked)return;
- locked=true;clearInterval(timer);broadcast({type:"stop"});
- // Give all clients a short moment to send their answers after receiving stop.
- setTimeout(()=>checkAnswers(true),1500);
+function beginReview(reason){
+if(!isHost||phase!=="play")return;phase="review";clearInterval(timerInt);
+players[myId].answers={...answers};players[myId].stopped=true;
+votes={};Object.values(players).forEach(p=>{p.votes={};});
+renderReview();broadcast({type:"REVIEW",round,letter,players:publicPlayers(),reason});
 }
-function syncMyAnswers(){
- const vals=collectMyAnswers();
- if(isHost){answers["host"]={name:myName,vals};}
- else if(conn&&conn.open&&!locked){try{conn.send({type:"answers",id:conn.peer,name:myName,vals});}catch(e){}}
+function publicPlayers(){return Object.values(players).map(p=>({id:p.id,name:p.name,answers:p.answers||emptyAnswers(),stopped:!!p.stopped}));}
+
+function renderReview(){
+let others=Object.values(players).filter(p=>p.id!==myId);
+let cards=others.map(p=>`<div class="review"><h3>🧑 ${esc(p.name)}</h3>
+${CATS.map(c=>{let v=p.answers?.[c[1]]||"";return `<div class="answer"><b>${c[0]}:</b> ${esc(v||"—")}
+<div class="voteRow"><button class="yes" data-p="${p.id}" data-k="${c[1]}" data-v="1">✅ صح</button><button class="no" data-p="${p.id}" data-k="${c[1]}" data-v="0">❌ غلط</button></div></div>`}).join("")}</div>`).join("");
+app.innerHTML=`<div class="card"><h2>📝 مراجعة الإجابات</h2><div class="status">راجع إجابات اللاعبين الآخرين. لا تراجع إجاباتك. بعد التصويت اضغط «إرسال المراجعة».</div></div>
+${cards||`<div class="card">لا يوجد لاعبون آخرون للمراجعة.</div>`}
+<div class="card"><button id="submitReview">إرسال المراجعة</button></div>`;
+document.querySelectorAll("[data-p]").forEach(b=>b.onclick=()=>{
+let p=b.dataset.p,k=b.dataset.k;if(!votes[p])votes[p]={};votes[p][k]=b.dataset.v==="1";
+b.parentElement.querySelectorAll("button").forEach(x=>x.style.opacity="0.45");b.style.opacity="1";
+});
+document.getElementById("submitReview").onclick=()=>{
+if(!isHost){send({type:"VOTES",from:myId,votes});renderWaitingReview();return;}
+players[myId].reviewSubmitted=true;players[myId].votes=votes;checkAllReviews();
+};
 }
-function collectMyAnswers(){
- const vals={};cats.forEach(c=>{const x=document.querySelector('#myFields input[data-cat="'+c+'"]');vals[c]=x?x.value.trim():"";});
- return vals;
+function renderWaitingReview(){app.innerHTML=`<div class="card"><h2>⏳ تم إرسال المراجعة</h2><div class="status good">في انتظار باقي اللاعبين...</div></div>`;}
+function checkAllReviews(){
+if(!isHost)return;
+let ps=Object.values(players);
+let ready=ps.every(p=>p.id===myId?p.reviewSubmitted===true:p.reviewSubmitted===true);
+if(!ready){broadcast({type:"REVIEW_WAIT",count:ps.filter(p=>p.reviewSubmitted).length,total:ps.length});renderHostReviewWait();return;}
+calculateAndShow();
 }
-function allFieldsFilled(){
- const vals=collectMyAnswers();
- return cats.every(c=>String(vals[c]||"").trim()!=="");
+function renderHostReviewWait(){
+app.innerHTML=`<div class="card"><h2>⏳ في انتظار المراجعة</h2><div class="status">تم إرسال مراجعة ${Object.values(players).filter(p=>p.reviewSubmitted).length} من ${Object.keys(players).length} لاعبين.</div></div>`;
 }
-function updateStopButton(){
- const ready=allFieldsFilled() && !locked;
- $("stop").disabled=!ready;
- if(locked)return;
- setStatus("playStatus", ready ? "كل الخانات مكتملة. يمكنك الضغط على استوب الآن." : "لازم تملأ كل الخانات الستة قبل الضغط على استوب.", ready);
-}
-function sendStop(){
- if(locked)return;
- if(!allFieldsFilled()){
-   setStatus("playStatus","لازم تملأ كل الخانات الستة قبل الضغط على استوب.");
-   return;
- }
- const vals=collectMyAnswers();
- document.querySelectorAll("#myFields input").forEach(x=>x.disabled=true);$("stop").disabled=true;show("waiting");
- if(isHost){
-   answers["host"]={name:myName,vals};
-   hostStop("host");
- } else {
-   locked=true;clearInterval(timer);
-   conn.send({type:"answers",id:conn.peer,name:myName,vals});
-   conn.send({type:"stop",id:conn.peer,name:myName,vals:collectMyAnswers()});
- }
-}
-function submitOnRemoteStop(){
- if(locked)return;locked=true;clearInterval(timer);
- const vals=collectMyAnswers();conn.send({type:"answers",id:conn.peer,name:myName,vals});
- document.querySelectorAll("#myFields input").forEach(x=>x.disabled=true);$("stop").disabled=true;show("waiting");
-}
-function checkAnswers(force=false){
- if(!isHost)return;
- const expected=players.filter(p=>p.connected).length;
- if(!force && Object.keys(answers).length<expected)return;
- players.forEach(p=>{if(!answers[p.id]&&p.id!=="host"&&p.connected)answers[p.id]={name:p.name,vals:{}};});
- const valid={};
- players.forEach(p=>{
-   const a=answers[p.id];if(!a)return;
-   valid[p.id]={};cats.forEach(c=>{const v=(a.vals[c]||"").trim();
-   const first=v ? v.charAt(0) : "";
-   valid[p.id][c]=(v && first===currentLetter)?v:"";});
+function calculateAndShow(){
+let ps=Object.values(players),accepted={};
+ps.forEach(p=>accepted[p.id]={});
+CATS.forEach(([label,k])=>{
+ps.forEach(target=>{
+let v=n(target.answers?.[k]), correct=false;
+if(v && valid(target.answers?.[k])){
+ let votesFor=0,votesAgainst=0,voters=0;
+ ps.forEach(reviewer=>{
+   if(reviewer.id===target.id)return;
+   let val=reviewer.votes?.[target.id]?.[k];
+   if(val===true){votesFor++;voters++;}
+   if(val===false){votesAgainst++;voters++;}
  });
- const out={};
- players.forEach(p=>out[p.id]=0);
- cats.forEach(c=>{
-   const groups={};
-   players.forEach(p=>{const v=valid[p.id]?.[c]||"";if(v){const k=v.toLowerCase();(groups[k]??=[]).push(p.id);}});
-   players.forEach(p=>{const v=valid[p.id]?.[c]||"";let pts=0;if(v){const n=groups[v.toLowerCase()].length;pts=n>1?5:10;}out[p.id]+=pts;});
- });
- players.forEach(p=>{scores[p.name]=(scores[p.name]||0)+(out[p.id]||0);});
- const packet={type:"results",round,letter:currentLetter,scores,players,points:out,answers};
- broadcast(packet);renderResults(packet);show("results");
+ if(ps.length===1) correct=true;
+ else correct=voters>0 && votesFor>votesAgainst;
 }
-function renderResults(pkt){
- $("roundResults").innerHTML='<div class="card"><b>الحرف: '+esc(pkt.letter)+'</b></div>'+players.map(p=>{
-  const a=pkt.answers[p.id]||{name:p.name,vals:{}};const pts=pkt.points[p.id]||0;
-  return '<div class="result"><b>'+esc(p.name)+'</b> — <b>+'+pts+' نقطة</b><br><span class="muted">'+cats.map(c=>c+": "+esc(a.vals[c]||"—")).join(" · ")+'</span></div>';
- }).join("");
- $("next").textContent=round<5?"الجولة التالية ➜":"عرض النتيجة النهائية";
+accepted[target.id][k]=correct;
+});
+});
+let result={};
+ps.forEach(p=>{
+let total=0,fields={};
+CATS.forEach(([label,k])=>{
+if(!accepted[p.id][k]){fields[k]=0;return;}
+let v=n(p.answers?.[k]);
+let same=ps.filter(q=>accepted[q.id][k]&&n(q.answers?.[k])===v).length;
+fields[k]=same===1?10:5;total+=fields[k];
+});
+scores[p.id]=(scores[p.id]||0)+total;result[p.id]={name:p.name,total,fields,answers:p.answers};
+});
+phase="results";renderResults(result);
+broadcast({type:"RESULTS",round,letter,result,scores});
 }
-function showFinal(pkt){
- const arr=players.map(p=>({name:p.name,s:pkt.scores[p.name]||0})).sort((a,b)=>b.s-a.s);
- $("finalResults").innerHTML=arr.map((x,i)=>'<div class="result"><b>'+(i+1)+". "+esc(x.name)+'</b><span style="float:left">'+x.s+" نقطة</span></div>").join("");
- show("final");
+function renderResults(result){
+app.innerHTML=`<div class="card"><h2>🏆 نتيجة الجولة</h2><div class="status">الحرف: <b>${esc(letter)}</b></div></div>
+${Object.values(result).map(r=>`<div class="result"><div><b>${esc(r.name)}</b> — <span class="points">+${r.total}</span> نقطة</div>
+<div class="small">${CATS.map(c=>`${c[0]}: ${esc(r.answers?.[c[1]]||"—")} (${r.fields[c[1]]||0})`).join(" · ")}</div></div>`).join("")}
+${isHost?`<button id="next">${round<TOTAL_ROUNDS?"الجولة التالية ➜":"إنهاء اللعبة 🏁"}</button>`:"<div class=\"status\">في انتظار صاحب الغرفة.</div>"}`;
+if(isHost)document.getElementById("next").onclick=()=>round<TOTAL_ROUNDS?startRound():showFinal();
 }
-function joinGame(){
- if(typeof Peer==="undefined"){setStatus("homeStatus","تعذر تحميل خدمة الاتصال. افتح الملف مع وجود إنترنت.");return}
- myName=$("joinName").value.trim()||"لاعب";
- roomId=$("roomCode").value.trim().toUpperCase();
- if(!roomId){setStatus("homeStatus","اكتب كود الغرفة أولاً.");return}
- if(!/^[A-Z0-9]{5}$/.test(roomId)){setStatus("homeStatus","كود الغرفة يجب أن يكون 5 أحرف/أرقام.");return}
- peer=new Peer({host:"0.peerjs.com",port:443,path:"/",secure:true,debug:0,pingInterval:5000,config:{iceServers:[{urls:"stun:stun.l.google.com:19302"}],sdpSemantics:"unified-plan"}});
- let attempts=0, done=false;
- const connectToHost=()=>{
-   if(done||!peer||peer.destroyed)return;
-   attempts++;
-   setStatus("homeStatus",`جاري الاتصال بالغرفة… (${attempts}/8)`);
-   try{
-     if(conn){try{conn.close()}catch(e){}}
-     conn=peer.connect("WB-"+roomId,{reliable:true,serialization:"json",metadata:{name:myName}});
-     let opened=false;
-     const failTimer=setTimeout(()=>{
-       if(opened||done)return;
-       try{conn.close()}catch(e){}
-       if(attempts<8)setTimeout(connectToHost,1000);
-       else setStatus("homeStatus","تعذر الوصول للغرفة. تأكد أن صاحب الغرفة فاتح اللعبة ومتصّل بالإنترنت.");
-     },7000);
-     conn.on("open",()=>{
-       opened=true;clearTimeout(failTimer);done=true;
-       conn.send({type:"join",name:myName});
-       setStatus("homeStatus","تم الاتصال بالغرفة.","ok");
-     });
-     conn.on("data",remoteMessage);
-     conn.on("error",()=>{
-       if(!done&&attempts<8)setTimeout(connectToHost,800);
-     });
-     conn.on("close",()=>{
-       if(!done&&attempts<8)setTimeout(connectToHost,800);
-     });
-   }catch(e){
-     if(attempts<8)setTimeout(connectToHost,1000);
-   }
- };
- peer.on("open",()=>connectToHost());
- peer.on("disconnected",()=>{
-   if(!done)setStatus("homeStatus","الاتصال بالخادم انقطع مؤقتًا… جاري المحاولة مرة أخرى.");
-   setTimeout(()=>{try{if(peer&&!peer.destroyed)peer.reconnect()}catch(e){}},800);
- });
- peer.on("error",e=>{
-   if(e.type==="peer-unavailable"||e.type==="network"||e.type==="socket-closed"||e.type==="socket-error"){
-     if(!done&&attempts<8)setTimeout(connectToHost,1000);
-   }else if(e.type==="browser-incompatible"){
-     setStatus("homeStatus","المتصفح لا يدعم اتصال اللعبة. جرّب Chrome.");
-   }else if(e.type!=="unavailable-id"){
-     setStatus("homeStatus","تعذر الاتصال بالغرفة: "+e.type);
-   }
- });
+function showFinal(){
+phase="final";clearInterval(timerInt);app.innerHTML=`<div class="card"><h2>🏁 النتيجة النهائية</h2>${Object.values(players).sort((a,b)=>(scores[b.id]||0)-(scores[a.id]||0)).map(p=>`<div class="result"><b>${esc(p.name)}</b> — <span class="points">${scores[p.id]||0}</span> نقطة</div>`).join("")}</div>`;
+broadcast({type:"FINAL",scores});
 }
-function remoteMessage(d){
- if(d.type==="full"){setStatus("homeStatus","الغرفة ممتلئة — الحد الأقصى 6 لاعبين.");return}
- if(d.type==="joined"){players=d.players;players.forEach(p=>scores[p.name]=scores[p.name]||0);$("room").textContent=d.room;renderPeople();show("lobby");}
- if(d.type==="players"){players=d.players;renderPeople();}
- if(d.type==="round"){showPlay(d);startClock();}
- if(d.type==="stop"){submitOnRemoteStop();}
- if(d.type==="results"){scores=d.scores;renderResults(d);show("results");}
- if(d.type==="final"){scores=d.scores;players=d.players;showFinal(d);}
+function handle(m){
+if(m.type==="JOIN"&&isHost){
+if(Object.keys(players).length>=MAX)return;
+if(players[m.id])return;
+players[m.id]={id:m.id,name:m.name,answers:emptyAnswers(),stopped:false,conn:null,reviewSubmitted:false,votes:{}};
+let c=peer.connect(m.id,{reliable:true});players[m.id].conn=c;c.on("open",()=>c.send({type:"WELCOME",hostId,players:publicPlayers(),scores,phase,round,letter,timerEnd}));
+renderHostLobby();return;
 }
-function inviteRoom(){
- const params=new URLSearchParams(location.search);
- const r=(params.get("room")||"").trim().toUpperCase();
- if(r){
-   $("roomCode").value=r;
-   $("joinName").focus();
-   setStatus("homeStatus","رابط دعوة لغرفة "+r+" — اكتب اسمك واضغط دخول الغرفة.","ok");
- }
+if(m.type==="WELCOME"){hostId=m.hostId;players={};m.players.forEach(p=>players[p.id]={...p,conn:null});scores=m.scores||{};renderJoinLobby("تم الدخول. في انتظار بدء الجولة.");return;}
+if(m.type==="START"){round=m.round;letter=m.letter;timerEnd=m.timerEnd;phase="play";answers=emptyAnswers();renderPlay();return;}
+if(m.type==="SYNC"&&isHost&&players[m.from||""]){}
+if(m.type==="SYNC"&&isHost&&(m.from||lastSender)&&players[m.from||lastSender]){players[m.from||lastSender].answers={...m.answers};return;}
+if(m.type==="STOP"&&isHost){
+let sender=m.from||lastSender;
+if(sender&&players[sender]){players[sender].answers={...m.answers};players[sender].stopped=true;beginReview("استوب");}
+return;
 }
-function shareRoom(){
- const url=location.origin+location.pathname+"?room="+encodeURIComponent(roomId);
- if(navigator.share){
-   navigator.share({title:"ولد بنت — دعوة للعبة",text:"ادخل العب معانا في ولد بنت 🎮",url}).catch(()=>{});
- }else if(navigator.clipboard){
-   navigator.clipboard.writeText(url).then(()=>setStatus("lobbyStatus","تم نسخ رابط الدعوة. ابعته لباقي اللاعبين.","ok"));
- }else{
-   window.prompt("انسخ رابط الدعوة:",url);
- }
+if(m.type==="VOTES"&&isHost){
+let sender=m.from||lastSender;if(sender&&players[sender]){players[sender].votes=m.votes;players[sender].reviewSubmitted=true;checkAllReviews();}return;
 }
-$("create").onclick=createHost;$("join").onclick=joinGame;$("share").onclick=shareRoom;inviteRoom();
-$("start").onclick=()=>{if(isHost)startRound()};
-$("stop").onclick=sendStop;
-$("next").onclick=()=>{if(isHost){if(round<5)startRound();else{const pkt={scores,players};broadcast({type:"final",scores,players});showFinal(pkt)}}};
-$("again").onclick=()=>location.reload();
-})();
+if(m.type==="REVIEW"){players={};m.players.forEach(p=>players[p.id]={...p});scores=scores||{};phase="review";letter=m.letter;round=m.round;renderReview();return;}
+if(m.type==="REVIEW_WAIT"){renderWaitingReview();return;}
+if(m.type==="RESULTS"){scores=m.scores||scores;phase="results";letter=m.letter;renderResults(m.result);return;}
+if(m.type==="FINAL"){scores=m.scores||scores;showFinal();return;}
+}
+let lastSender="";
+function wireHostConnections(){
+Object.values(players).forEach(p=>{
+ if(!p.conn||p.conn.__wired)return;
+ p.conn.__wired=true;
+ p.conn.on("data",m=>{lastSender=p.id;handle(m);});
+ p.conn.on("close",()=>{if(isHost){p.conn=null;}});
+});
+}
+const oldBroadcast=broadcast;
+broadcast=(m)=>{wireHostConnections();oldBroadcast(m);}
+const oldRender=renderHostLobby;
+renderHostLobby=(msg="")=>{oldRender(msg);setTimeout(wireHostConnections,50);};
+
+renderHostLobby=(()=>{const orig=renderHostLobby;return function(msg=""){orig(msg);setTimeout(wireHostConnections,50);}})();
+lobby();
 </script>
-</body>
-</html>
+</body></html>
