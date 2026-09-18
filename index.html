@@ -49,12 +49,13 @@ app.innerHTML=`<div class="card"><h2>👑 إنشاء لعبة</h2><input id="cn"
 ${msg?`<div class="status bad">${esc(msg)}</div>`:""}`;
 document.getElementById("cb").onclick=createRoom;document.getElementById("jb").onclick=joinRoom;
 }
-function makePeer(cb){
-peer=new Peer();
-peer.on("open",id=>{myId=id;cb();});
-peer.on("error",e=>{let t=e?.type||"network"; if(phase==="lobby") lobby("تعذر الاتصال: "+t);});
-peer.on("disconnected",()=>{try{peer.reconnect()}catch(e){}});
+function makePeer(id,cb){
+  peer=id?new Peer(id):new Peer();
+  peer.on("open",x=>{myId=x;cb();});
+  peer.on("error",e=>{let t=e?.type||"network"; if(phase==="lobby") lobby("تعذر الاتصال: "+t);});
+  peer.on("disconnected",()=>{try{peer.reconnect()}catch(e){}});
 }
+
 function createRoom(){
 name=document.getElementById("cn").value.trim();if(!name)return alert("اكتب اسمك.");
 isHost=true;room=Math.random().toString(36).slice(2,7).toUpperCase();hostId="";
@@ -63,7 +64,7 @@ makePeer(()=>{hostId=myId;players[myId]={id:myId,name,answers:emptyAnswers(),sto
 }
 function joinRoom(){
 name=document.getElementById("jn").value.trim();room=document.getElementById("rc").value.trim().toUpperCase();
-hostId=linkHost;if(!name)return alert("اكتب اسمك.");if(!room)return alert("اكتب كود الغرفة.");if(!hostId)return lobby("رابط الدعوة غير كامل. استخدم زر مشاركة رابط الغرفة.");
+hostId="WB-"+room;if(!name)return alert("اكتب اسمك.");if(!room)return alert("اكتب كود الغرفة.");if(!hostId)return lobby("رابط الدعوة غير كامل. استخدم زر مشاركة رابط الغرفة.");
 isHost=false;phase="lobby";makePeer(()=>{
 hostConn=peer.connect(hostId,{reliable:true});
 hostConn.on("open",()=>{hostConn.send({type:"JOIN",id:myId,name});renderJoinLobby("تم الاتصال بالغرفة.");});
@@ -82,7 +83,7 @@ app.innerHTML=`<div class="card"><h2>🏠 الغرفة: ${esc(room)}</h2><div cl
 <div class="card"><h2>👥 اللاعبين</h2><div class="players">${Object.values(players).map(p=>`<div>🟢 ${esc(p.name)}</div>`).join("")}</div></div>`;
 }
 async function share(){
-let url=location.origin+location.pathname+"?room="+encodeURIComponent(room)+"&host="+encodeURIComponent(hostId);
+let url=location.origin+location.pathname+"?room="+encodeURIComponent(room);
 if(navigator.share){try{await navigator.share({title:"ولد بنت",text:"ادخل لعبة ولد بنت من الرابط ده",url});return}catch(e){}}
 try{await navigator.clipboard.writeText(url);alert("تم نسخ رابط الغرفة.");}catch(e){prompt("انسخ الرابط:",url);}
 }
@@ -206,7 +207,7 @@ players[m.id]={id:m.id,name:m.name,answers:emptyAnswers(),stopped:false,conn:nul
 let c=peer.connect(m.id,{reliable:true});players[m.id].conn=c;c.on("open",()=>c.send({type:"WELCOME",hostId,players:publicPlayers(),scores,phase,round,letter,timerEnd}));
 renderHostLobby();return;
 }
-if(m.type==="WELCOME"){hostId=m.hostId;players={};m.players.forEach(p=>players[p.id]={...p,conn:null});scores=m.scores||{};renderJoinLobby("تم الدخول. في انتظار بدء الجولة.");return;}
+if(m.type==="WELCOME"){hostId=m.hostId||("WB-"+room);players={};m.players.forEach(p=>players[p.id]={...p,conn:null});scores=m.scores||{};renderJoinLobby("تم الدخول. في انتظار بدء الجولة.");return;}
 if(m.type==="START"){round=m.round;letter=m.letter;timerEnd=m.timerEnd;phase="play";answers=emptyAnswers();renderPlay();return;}
 if(m.type==="SYNC"&&isHost&&players[m.from||""]){}
 if(m.type==="SYNC"&&isHost&&(m.from||lastSender)&&players[m.from||lastSender]){players[m.from||lastSender].answers={...m.answers};return;}
