@@ -56,11 +56,11 @@ button.alt{background:#eee;color:#222}.stop{background:#b00020}.hidden{display:n
 <div class="card">
 <div id="round" style="font-weight:900"></div>
 <div class="big" id="letter">؟</div>
-<div class="timer" id="timer">60 ثانية</div>
+<div class="timer" id="timer">120 ثانية</div>
 </div>
 <div id="myFields"></div>
-<button id="stop" class="stop">🛑 استوب — أنا خلصت</button>
-<div id="playStatus" class="status">اكتب إجاباتك ثم اضغط استوب.</div>
+<button id="stop" class="stop" disabled>🛑 استوب — أنا خلصت</button>
+<div id="playStatus" class="status">لازم تملأ كل الخانات الستة قبل الضغط على استوب.</div>
 </section>
 
 <section id="waiting" class="hidden">
@@ -88,7 +88,7 @@ button.alt{background:#eee;color:#222}.stop{background:#b00020}.hidden{display:n
 (function(){
 const cats=["ولد","بنت","حيوان","جماد","دولة","نبات"];
 const letters=["ا","ب","ت","ج","ح","خ","د","ذ","ر","ز","س","ش","ص","ض","ط","ظ","ع","غ","ف","ق","ك","ل","م","ن","ه","و","ي"];
-let peer=null, conn=null, isHost=false, myName="", roomId="", peers={}, players=[], scores={}, round=0, currentLetter="", timer=null, seconds=60, locked=false, answers={}, stopRequested=false;
+let peer=null, conn=null, isHost=false, myName="", roomId="", peers={}, players=[], scores={}, round=0, currentLetter="", timer=null, seconds=120, locked=false, answers={}, stopRequested=false;
 
 const $=id=>document.getElementById(id);
 function show(id){["home","lobby","play","waiting","results","final"].forEach(x=>$(x).classList.toggle("hidden",x!==id));}
@@ -125,7 +125,7 @@ function hostMessage(c,d){
 }
 function broadcast(msg){Object.values(peers).forEach(c=>{try{c.send(msg)}catch(e){}});}
 function startRound(){
- round++;currentLetter=letters[Math.floor(Math.random()*letters.length)];seconds=60;locked=false;answers={};stopRequested=false;
+ round++;currentLetter=letters[Math.floor(Math.random()*letters.length)];seconds=120;locked=false;answers={};stopRequested=false;
  const msg={type:"round",round,letter:currentLetter,seconds};
  broadcast(msg);showPlay(msg);startClock();
 }
@@ -133,7 +133,9 @@ function showPlay(msg){
  $("round").textContent="الجولة "+msg.round+" من 5";
  $("letter").textContent=msg.letter;$("timer").textContent=msg.seconds+" ثانية";
  $("myFields").innerHTML=cats.map(c=>'<label class="label">'+c+'<input data-cat="'+c+'" autocomplete="off"></label>').join("");
- $("stop").disabled=false;setStatus("playStatus","اكتب إجاباتك ثم اضغط استوب.");show("play");
+ $("stop").disabled=true;
+ $("myFields").querySelectorAll("input").forEach(x=>x.addEventListener("input",updateStopButton));
+ setStatus("playStatus","لازم تملأ كل الخانات الستة قبل الضغط على استوب.");show("play");updateStopButton();
 }
 function startClock(){
  clearInterval(timer);timer=setInterval(()=>{seconds--; $("timer").textContent=seconds+" ثانية";if(seconds<=0)hostStop("timer");},1000);
@@ -142,18 +144,39 @@ function hostStop(who){
  if(!isHost||locked)return;
  locked=true;clearInterval(timer);broadcast({type:"stop"});
  // Give all clients a short moment to send their answers after receiving stop.
- setTimeout(()=>checkAnswers(true),1200);
+ setTimeout(()=>checkAnswers(true),1500);
 }
 function collectMyAnswers(){
  const vals={};cats.forEach(c=>{const x=document.querySelector('#myFields input[data-cat="'+c+'"]');vals[c]=x?x.value.trim():"";});
  return vals;
 }
+function allFieldsFilled(){
+ const vals=collectMyAnswers();
+ return cats.every(c=>String(vals[c]||"").trim()!=="");
+}
+function updateStopButton(){
+ const ready=allFieldsFilled() && !locked;
+ $("stop").disabled=!ready;
+ if(locked)return;
+ setStatus("playStatus", ready ? "كل الخانات مكتملة. يمكنك الضغط على استوب الآن." : "لازم تملأ كل الخانات الستة قبل الضغط على استوب.", ready);
+}
 function sendStop(){
  if(locked)return;
+ if(!allFieldsFilled()){
+   setStatus("playStatus","لازم تملأ كل الخانات الستة قبل الضغط على استوب.");
+   return;
+ }
  const vals=collectMyAnswers();
  document.querySelectorAll("#myFields input").forEach(x=>x.disabled=true);$("stop").disabled=true;show("waiting");
- if(isHost){answers["host"]={name:myName,vals};hostStop("host");}
- else {locked=true;clearInterval(timer);conn.send({type:"answers",id:conn.peer,name:myName,vals});conn.send({type:"stop",id:conn.peer});}
+ if(isHost){
+   // The host must submit its answers BEFORE locking the round.
+   answers["host"]={name:myName,vals};
+   hostStop("host");
+ } else {
+   locked=true;clearInterval(timer);
+   conn.send({type:"answers",id:conn.peer,name:myName,vals});
+   conn.send({type:"stop",id:conn.peer});
+ }
 }
 function submitOnRemoteStop(){
  if(locked)return;locked=true;clearInterval(timer);
@@ -171,10 +194,11 @@ function checkAnswers(force=false){
    valid[p.id]={};cats.forEach(c=>{const v=(a.vals[c]||"").trim();valid[p.id][c]=(v&&v.charAt(0)===currentLetter)?v:"";});
  });
  const out={};
+ players.forEach(p=>out[p.id]=0);
  cats.forEach(c=>{
    const groups={};
    players.forEach(p=>{const v=valid[p.id]?.[c]||"";if(v){const k=v.toLowerCase();(groups[k]??=[]).push(p.id);}});
-   players.forEach(p=>{const v=valid[p.id]?.[c]||"";let pts=0;if(v){const n=groups[v.toLowerCase()].length;pts=n>1?5:10;}out[p.id]=(out[p.id]||0)+pts;});
+   players.forEach(p=>{const v=valid[p.id]?.[c]||"";let pts=0;if(v){const n=groups[v.toLowerCase()].length;pts=n>1?5:10;}out[p.id]+=pts;});
  });
  players.forEach(p=>{scores[p.name]=(scores[p.name]||0)+(out[p.id]||0);});
  const packet={type:"results",round,letter:currentLetter,scores,players,points:out,answers};
