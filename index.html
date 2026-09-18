@@ -33,6 +33,7 @@ button.alt{background:#eee;color:#222}.stop{background:#b00020}.hidden{display:n
 <h2>👤 دخول لعبة</h2>
 <input id="joinName" placeholder="اسمك">
 <input id="roomCode" placeholder="كود الغرفة" style="margin-top:8px;text-transform:uppercase">
+<p id="inviteHint" class="muted" style="margin:8px 0 0">لو فتحت رابط دعوة، كود الغرفة هيظهر تلقائيًا هنا.</p>
 <button id="join">دخول الغرفة</button>
 </div>
 <div id="homeStatus" class="status">يجب أن يكون كل الموبايلات متصلة بالإنترنت.</div>
@@ -44,6 +45,7 @@ button.alt{background:#eee;color:#222}.stop{background:#b00020}.hidden{display:n
 <div class="room" id="room"></div>
 <p class="muted" style="text-align:center">ابعت الكود ده لباقي أفراد الأسرة.</p>
 <div id="lobbyStatus" class="status">في انتظار اللاعبين...</div>
+<button id="share" class="alt">🔗 مشاركة رابط الغرفة</button>
 </div>
 <div class="card">
 <h3>👥 اللاعبين</h3>
@@ -106,7 +108,7 @@ function createHost(){
  myName=$("hostName").value.trim()||"المضيف";
  isHost=true;roomId=code();
  peer=new Peer("WB-"+roomId,{debug:0});
- peer.on("open",()=>{addHostPlayer();$("room").textContent=roomId;show("lobby");setStatus("lobbyStatus","الغرفة جاهزة. ابعت الكود لحد أقصى 5 لاعبين.","ok");$("start").classList.remove("hidden");});
+ peer.on("open",()=>{addHostPlayer();$("room").textContent=roomId;show("lobby");setStatus("lobbyStatus","الغرفة جاهزة. استخدم زر مشاركة الرابط لإرسال الدعوة.","ok");$("start").classList.remove("hidden");});
  peer.on("connection",c=>{
    c.on("open",()=>{peers[c.peer]=c;});
    c.on("data",data=>hostMessage(c,data));
@@ -239,7 +241,26 @@ function remoteMessage(d){
  if(d.type==="results"){scores=d.scores;renderResults(d);show("results");}
  if(d.type==="final"){scores=d.scores;players=d.players;showFinal(d);}
 }
-$("create").onclick=createHost;$("join").onclick=joinGame;
+function inviteRoom(){
+ const params=new URLSearchParams(location.search);
+ const r=(params.get("room")||"").trim().toUpperCase();
+ if(r){
+   $("roomCode").value=r;
+   $("joinName").focus();
+   setStatus("homeStatus","رابط دعوة لغرفة "+r+" — اكتب اسمك واضغط دخول الغرفة.","ok");
+ }
+}
+function shareRoom(){
+ const url=location.origin+location.pathname+"?room="+encodeURIComponent(roomId);
+ if(navigator.share){
+   navigator.share({title:"ولد بنت — دعوة للعبة",text:"ادخل العب معانا في ولد بنت 🎮",url}).catch(()=>{});
+ }else if(navigator.clipboard){
+   navigator.clipboard.writeText(url).then(()=>setStatus("lobbyStatus","تم نسخ رابط الدعوة. ابعته لباقي اللاعبين.","ok"));
+ }else{
+   window.prompt("انسخ رابط الدعوة:",url);
+ }
+}
+$("create").onclick=createHost;$("join").onclick=joinGame;$("share").onclick=shareRoom;inviteRoom();
 $("start").onclick=()=>{if(isHost)startRound()};
 $("stop").onclick=sendStop;
 $("next").onclick=()=>{if(isHost){if(round<5)startRound();else{const pkt={scores,players};broadcast({type:"final",scores,players});showFinal(pkt)}}};
