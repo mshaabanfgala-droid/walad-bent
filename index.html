@@ -30,7 +30,6 @@ let answers=emptyAnswers(),players={},scores={},myVotes={};
 const app=document.getElementById("app");
 const qs=new URLSearchParams(location.search);
 const linkRoom=(qs.get("room")||"").toUpperCase();
-const linkHost=qs.get("host")||"";
 
 function emptyAnswers(){return {boy:"",girl:"",animal:"",object:"",country:"",plant:""}}
 function esc(s){return String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));}
@@ -47,24 +46,46 @@ app.innerHTML=`<div class="card"><h2>👑 إنشاء لعبة</h2><input id="cn"
 ${msg?`<div class="status bad">${esc(msg)}</div>`:""}`;
 document.getElementById("create").onclick=createRoom;document.getElementById("join").onclick=joinRoom;
 }
-function newPeer(){
-peer=new Peer();
-peer.on("open",id=>{myId=id;if(isHost)hostReady();else connectToHost();});
-peer.on("connection",conn=>{if(!isHost)return;setupHostConnection(conn);});
-peer.on("error",e=>{let m=e?.type||"network";if(phase==="lobby"){if(isHost)renderHostLobby("خطأ في الاتصال: "+m);else renderLobby("تعذر الاتصال: "+m)}});
-peer.on("disconnected",()=>{try{peer.reconnect()}catch(e){}});
+function newPeer(isCreatingHost=false){
+  peer=isCreatingHost ? new Peer("WB-"+room) : new Peer();
+  peer.on("open",id=>{
+    myId=id;
+    if(isHost) hostReady();
+    else connectToHost();
+  });
+  peer.on("connection",conn=>{
+    if(isHost) setupHostConnection(conn);
+  });
+  peer.on("error",e=>{
+    let m=e?.type||"network";
+    if(phase==="lobby"){
+      if(isHost) renderHostLobby("خطأ في الاتصال: "+m+" — لو الكود مستخدم، اعمل غرفة جديدة.");
+      else renderLobby("تعذر الاتصال: "+m);
+    }
+  });
+  peer.on("disconnected",()=>{try{peer.reconnect()}catch(e){}});
 }
 function createRoom(){
-name=document.getElementById("cn").value.trim();if(!name)return alert("اكتب اسمك أولًا.");
-isHost=true;room=Math.random().toString(36).slice(2,7).toUpperCase();round=0;scores={};players={};phase="lobby";newPeer();
+  name=document.getElementById("cn").value.trim();
+  if(!name)return alert("اكتب اسمك أولًا.");
+  isHost=true;
+  room=Math.random().toString(36).slice(2,7).toUpperCase();
+  hostId="WB-"+room;
+  round=0;scores={};players={};phase="lobby";
+  newPeer(true);
 }
 function hostReady(){
-hostId=myId;players[myId]={id:myId,name,answers:emptyAnswers(),stopped:false,conn:null,votes:{},reviewSubmitted:false};renderHostLobby();
+  players[myId]={id:myId,name,answers:emptyAnswers(),stopped:false,conn:null,votes:{},reviewSubmitted:false};
+  renderHostLobby();
 }
 function joinRoom(){
-name=document.getElementById("jn").value.trim();room=document.getElementById("rc").value.trim().toUpperCase();
-hostId=linkHost;if(!name)return alert("اكتب اسمك أولًا.");if(!room)return alert("اكتب كود الغرفة.");if(!hostId)return renderLobby("رابط الدعوة غير كامل. استخدم زر مشاركة رابط الغرفة.");
-isHost=false;phase="lobby";newPeer();
+  name=document.getElementById("jn").value.trim();
+  room=document.getElementById("rc").value.trim().toUpperCase();
+  if(!name)return alert("اكتب اسمك أولًا.");
+  if(!room)return alert("اكتب كود الغرفة.");
+  hostId="WB-"+room;
+  isHost=false;phase="lobby";
+  newPeer(false);
 }
 function connectToHost(){
 hostConn=peer.connect(hostId,{reliable:true});
@@ -98,9 +119,11 @@ function publicPlayers(){return Object.values(players).map(p=>({id:p.id,name:p.n
 function broadcast(m){Object.values(players).forEach(p=>{if(p.conn?.open)p.conn.send(m)})}
 function broadcastPlayers(){broadcast({type:"PLAYERS",players:publicPlayers()})}
 async function shareRoom(){
-let u=location.origin+location.pathname+"?room="+encodeURIComponent(room)+"&host="+encodeURIComponent(hostId);
-if(navigator.share){try{await navigator.share({title:"ولد بنت",text:"ادخل لعبة ولد بنت من الرابط ده",url:u});return}catch(e){}}
-try{await navigator.clipboard.writeText(u);alert("تم نسخ رابط الغرفة.")}catch(e){prompt("انسخ الرابط:",u)}
+  let u=location.origin+location.pathname+"?room="+encodeURIComponent(room);
+  if(navigator.share){
+    try{await navigator.share({title:"ولد بنت",text:"ادخل لعبة ولد بنت من الرابط ده",url:u});return}catch(e){}
+  }
+  try{await navigator.clipboard.writeText(u);alert("تم نسخ رابط الغرفة.")}catch(e){prompt("انسخ الرابط:",u)}
 }
 function renderHostLobby(msg=""){
 app.innerHTML=`<div class="card"><h2>🏠 غرفة اللعبة</h2><div class="big" style="font-size:46px">${esc(room)}</div>
