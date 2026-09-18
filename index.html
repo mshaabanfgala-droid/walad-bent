@@ -151,17 +151,22 @@ function showPlay(msg){
  $("letter").textContent=msg.letter;$("timer").textContent=msg.seconds+" ثانية";
  $("myFields").innerHTML=cats.map(c=>'<label class="label">'+c+'<input data-cat="'+c+'" autocomplete="off"></label>').join("");
  $("stop").disabled=true;
- $("myFields").querySelectorAll("input").forEach(x=>x.addEventListener("input",updateStopButton));
+ $("myFields").querySelectorAll("input").forEach(x=>x.addEventListener("input",()=>{updateStopButton(); syncMyAnswers();}));
  setStatus("playStatus","لازم تملأ كل الخانات الستة قبل الضغط على استوب.");show("play");updateStopButton();
 }
 function startClock(){
- clearInterval(timer);timer=setInterval(()=>{seconds--; $("timer").textContent=seconds+" ثانية";if(seconds<=0)hostStop("timer");},1000);
+ clearInterval(timer);timer=setInterval(()=>{seconds--; $("timer").textContent=seconds+" ثانية"; if(seconds<=0){ clearInterval(timer); if(isHost){ syncMyAnswers(); hostStop("timer"); } else { syncMyAnswers(); locked=true; if(conn&&conn.open)try{conn.send({type:"stop",id:conn.peer});}catch(e){} show("waiting"); } }},1000);
 }
 function hostStop(who){
  if(!isHost||locked)return;
  locked=true;clearInterval(timer);broadcast({type:"stop"});
  // Give all clients a short moment to send their answers after receiving stop.
  setTimeout(()=>checkAnswers(true),1500);
+}
+function syncMyAnswers(){
+ const vals=collectMyAnswers();
+ if(isHost){answers["host"]={name:myName,vals};}
+ else if(conn&&conn.open&&!locked){try{conn.send({type:"answers",id:conn.peer,name:myName,vals});}catch(e){}}
 }
 function collectMyAnswers(){
  const vals={};cats.forEach(c=>{const x=document.querySelector('#myFields input[data-cat="'+c+'"]');vals[c]=x?x.value.trim():"";});
@@ -186,7 +191,6 @@ function sendStop(){
  const vals=collectMyAnswers();
  document.querySelectorAll("#myFields input").forEach(x=>x.disabled=true);$("stop").disabled=true;show("waiting");
  if(isHost){
-   // The host must submit its answers BEFORE locking the round.
    answers["host"]={name:myName,vals};
    hostStop("host");
  } else {
@@ -208,7 +212,9 @@ function checkAnswers(force=false){
  const valid={};
  players.forEach(p=>{
    const a=answers[p.id];if(!a)return;
-   valid[p.id]={};cats.forEach(c=>{const v=(a.vals[c]||"").trim();valid[p.id][c]=(v&&v.charAt(0)===currentLetter)?v:"";});
+   valid[p.id]={};cats.forEach(c=>{const v=(a.vals[c]||"").trim();
+   const first=v ? v.charAt(0) : "";
+   valid[p.id][c]=(v && first===currentLetter)?v:"";});
  });
  const out={};
  players.forEach(p=>out[p.id]=0);
