@@ -137,7 +137,11 @@ function hostMessage(c,d){
    const p={id:c.peer,name:d.name||"لاعب",connected:true};players.push(p);scores[p.name]=0;peers[c.peer]=c;
    c.send({type:"joined",room:roomId,players});broadcast({type:"players",players});
    renderPeople();
- }else if(d.type==="stop"){hostStop(d.id||c.peer)}
+ }else if(d.type==="stop"){
+   const id=d.id||c.peer;
+   if(d.vals) answers[id]={name:d.name||players.find(x=>x.id===id)?.name||"لاعب",vals:d.vals};
+   hostStop(id);
+ }
  else if(d.type==="answers"){answers[d.id]={name:d.name,vals:d.vals};}
 }
 function broadcast(msg){Object.values(peers).forEach(c=>{try{c.send(msg)}catch(e){}});}
@@ -155,7 +159,7 @@ function showPlay(msg){
  setStatus("playStatus","لازم تملأ كل الخانات الستة قبل الضغط على استوب.");show("play");updateStopButton();
 }
 function startClock(){
- clearInterval(timer);timer=setInterval(()=>{seconds--; $("timer").textContent=seconds+" ثانية"; if(seconds<=0){ clearInterval(timer); if(isHost){ syncMyAnswers(); hostStop("timer"); } else { syncMyAnswers(); locked=true; if(conn&&conn.open)try{conn.send({type:"stop",id:conn.peer});}catch(e){} show("waiting"); } }},1000);
+ clearInterval(timer);timer=setInterval(()=>{seconds--; $("timer").textContent=seconds+" ثانية"; if(seconds<=0){ clearInterval(timer); if(isHost){ syncMyAnswers(); hostStop("timer"); } else { syncMyAnswers(); locked=true; if(conn&&conn.open)try{conn.send({type:"stop",id:conn.peer,name:myName,vals:collectMyAnswers()});}catch(e){} show("waiting"); } }},1000);
 }
 function hostStop(who){
  if(!isHost||locked)return;
@@ -196,7 +200,7 @@ function sendStop(){
  } else {
    locked=true;clearInterval(timer);
    conn.send({type:"answers",id:conn.peer,name:myName,vals});
-   conn.send({type:"stop",id:conn.peer});
+   conn.send({type:"stop",id:conn.peer,name:myName,vals:collectMyAnswers()});
  }
 }
 function submitOnRemoteStop(){
