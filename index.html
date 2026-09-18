@@ -138,7 +138,7 @@ function hostMessage(c,d){
    c.send({type:"joined",room:roomId,players});broadcast({type:"players",players});
    renderPeople();
  }else if(d.type==="stop"){hostStop(d.id||c.peer)}
- else if(d.type==="answers"){answers[d.id]={name:d.name,vals:d.vals};checkAnswers();}
+ else if(d.type==="answers"){answers[d.id]={name:d.name,vals:d.vals};}
 }
 function broadcast(msg){Object.values(peers).forEach(c=>{try{c.send(msg)}catch(e){}});}
 function startRound(){
