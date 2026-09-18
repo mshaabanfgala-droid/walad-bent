@@ -25,7 +25,7 @@ const LETTERS=["ا","ب","ت","ث","ج","ح","خ","د","ذ","ر","ز","س","ش",
 const MAX_PLAYERS=6, ROUND_SECONDS=120, TOTAL_ROUNDS=5;
 let peer=null,myId="",hostId="",hostConn=null,isHost=false,room="",name="";
 let phase="lobby",round=0,letter="",timerEnd=0,timerInt=null;
-let answers=emptyAnswers(),players={},scores={},myVotes={};
+let answers=emptyAnswers(),players={},scores={},myVotes={},usedLetters=[];
 
 const app=document.getElementById("app");
 const qs=new URLSearchParams(location.search);
@@ -71,7 +71,7 @@ function createRoom(){
   isHost=true;
   room=Math.random().toString(36).slice(2,7).toUpperCase();
   hostId="WB-"+room;
-  round=0;scores={};players={};phase="lobby";
+  round=0;scores={};players={};usedLetters=[];phase="lobby";
   newPeer(true);
 }
 function hostReady(){
@@ -103,7 +103,7 @@ if(m.room!==room)return;
 if(Object.keys(players).length>=MAX_PLAYERS)return;
 if(players[m.from])return;
 players[m.from]={id:m.from,name:m.name,answers:emptyAnswers(),stopped:false,conn:conn,votes:{},reviewSubmitted:false};
-conn.send({type:"WELCOME",hostId,room,players:publicPlayers(),scores,phase,round,letter,timerEnd});
+conn.send({type:"WELCOME",hostId,room,players:publicPlayers(),scores,usedLetters,phase,round,letter,timerEnd});
 	broadcastPlayers();renderHostLobby();return;
 }
 if(!players[m.from])return;
@@ -113,6 +113,9 @@ players[m.from].answers={...m.answers};players[m.from].stopped=true;beginReview(
 }
 if(m.type==="VOTES"&&phase==="review"){
 players[m.from].votes=m.votes||{};players[m.from].reviewSubmitted=true;checkReviews();return;
+}
+if(m.type==="REOPEN_REVIEW"&&phase==="review"){
+players[m.from].votes={};players[m.from].reviewSubmitted=false;checkReviews();return;
 }
 }
 function publicPlayers(){return Object.values(players).map(p=>({id:p.id,name:p.name,answers:p.answers||emptyAnswers(),stopped:!!p.stopped}))}
@@ -137,9 +140,15 @@ app.innerHTML=`<div class="card"><h2>🏠 الغرفة: ${esc(room)}</h2><div cl
 <div class="card"><h2>👥 اللاعبين</h2><div class="players">${Object.values(players).map(p=>`<div>🟢 ${esc(p.name)}</div>`).join("")}</div></div>`;
 }
 function startRound(){
-if(!isHost)return;round++;letter=LETTERS[Math.floor(Math.random()*LETTERS.length)];phase="play";timerEnd=Date.now()+ROUND_SECONDS*1000;
+if(!isHost)return;
+round++;
+let remaining=LETTERS.filter(l=>!usedLetters.includes(l));
+if(!remaining.length) { usedLetters=[]; remaining=[...LETTERS]; }
+letter=remaining[Math.floor(Math.random()*remaining.length)];
+usedLetters.push(letter);
+phase="play";timerEnd=Date.now()+ROUND_SECONDS*1000;
 answers=emptyAnswers();Object.values(players).forEach(p=>{p.answers=emptyAnswers();p.stopped=false;p.votes={};p.reviewSubmitted=false});
-renderPlay();broadcast({type:"START",round,letter,timerEnd});startTimer();
+renderPlay();broadcast({type:"START",round,letter,timerEnd,usedLetters});startTimer();
 }
 function startTimer(){
 clearInterval(timerInt);timerInt=setInterval(()=>{let left=Math.max(0,timerEnd-Date.now()),el=document.getElementById("timer");if(el)el.textContent=ttext(left);
@@ -161,15 +170,75 @@ if(!isHost||phase!=="play")return;phase="review";clearInterval(timerInt);players
 Object.values(players).forEach(p=>{p.reviewSubmitted=false;p.votes={}});renderReview();broadcast({type:"REVIEW",round,letter,players:publicPlayers(),reason});
 }
 function renderReview(){
-myVotes={};let others=Object.values(players).filter(p=>p.id!==myId);
-app.innerHTML=`<div class="card"><h2>📝 مراجعة الإجابات</h2><div class="status">راجع إجابات اللاعبين الآخرين فقط. اختار صح أو غلط لكل خانة ثم اضغط إرسال المراجعة.</div></div>
+myVotes={};
+let others=Object.values(players).filter(p=>p.id!==myId);
+let submitted=isHost ? !!players[myId]?.reviewSubmitted : false;
+
+app.innerHTML=`<div class="card"><h2>📝 مراجعة الإجابات</h2>
+<div class="status">راجع إجابات اللاعبين الآخرين. لازم تختار <b>صح أو غلط لكل خانة</b> قبل إرسال المراجعة.</div>
+<div id="reviewProgress" class="status">0 من ${others.length*CATS.length} إجابة تم تقييمها</div></div>
 ${others.map(p=>`<div class="review"><h3>🧑 ${esc(p.name)}</h3>${CATS.map(c=>`<div class="answer"><b>${c[0]}:</b> ${esc(p.answers?.[c[1]]||"—")}
 <div class="voteRow"><button class="yes" data-p="${p.id}" data-k="${c[1]}" data-v="1">✅ صح</button><button class="no" data-p="${p.id}" data-k="${c[1]}" data-v="0">❌ غلط</button></div></div>`).join("")}</div>`).join("")}
 <button id="submit">إرسال المراجعة</button>`;
-document.querySelectorAll("[data-p]").forEach(b=>b.onclick=()=>{let p=b.dataset.p,k=b.dataset.k;if(!myVotes[p])myVotes[p]={};myVotes[p][k]=b.dataset.v==="1";b.parentElement.querySelectorAll("button").forEach(x=>x.style.opacity=".45");b.style.opacity="1"});
-document.getElementById("submit").onclick=()=>{if(isHost){players[myId].votes=myVotes;players[myId].reviewSubmitted=true;checkReviews()}else{hostConn?.send({type:"VOTES",from:myId,votes:myVotes});renderWaiting()}};
+
+function refreshProgress(){
+let done=0,total=others.length*CATS.length;
+document.querySelectorAll("[data-p]").forEach(b=>{
+  let p=b.dataset.p,k=b.dataset.k;
+  if(myVotes[p]&&Object.prototype.hasOwnProperty.call(myVotes[p],k)){
+    done++;
+    let val=myVotes[p][k];
+    b.parentElement.querySelectorAll("button").forEach(x=>x.style.opacity=".45");
+    let selected=b.parentElement.querySelector(`[data-v="${val?"1":"0"}"]`);
+    if(selected)selected.style.opacity="1";
+  }
+});
+let pr=document.getElementById("reviewProgress");
+if(pr)pr.textContent=`${done} من ${total} إجابة تم تقييمها`;
+let submit=document.getElementById("submit");
+if(submit)submit.disabled=(done!==total);
 }
-function renderWaiting(){app.innerHTML=`<div class="card"><h2>⏳ تم إرسال المراجعة</h2><div class="status good">في انتظار باقي اللاعبين...</div></div>`}
+
+document.querySelectorAll("[data-p]").forEach(b=>b.onclick=()=>{
+  let p=b.dataset.p,k=b.dataset.k;
+  if(!myVotes[p])myVotes[p]={};
+  myVotes[p][k]=b.dataset.v==="1";
+  refreshProgress();
+});
+
+document.getElementById("submit").onclick=()=>{
+  let total=others.length*CATS.length;
+  let done=Object.values(myVotes).reduce((n,x)=>n+Object.keys(x).length,0);
+  if(done!==total){alert("لازم تقيّم كل الإجابات أولًا.");return;}
+  if(isHost){
+    players[myId].votes=myVotes;
+    players[myId].reviewSubmitted=true;
+    renderWaiting(true);
+    checkReviews();
+  }else{
+    hostConn?.send({type:"VOTES",from:myId,votes:myVotes});
+    renderWaiting(true);
+  }
+};
+refreshProgress();
+}
+function renderWaiting(canReset=false){
+app.innerHTML=`<div class="card"><h2>⏳ تم إرسال المراجعة</h2>
+<div class="status good">تم تقييم كل الإجابات. في انتظار باقي اللاعبين.</div>
+${canReset?`<button id="resetReview" class="alt">🔄 إعادة التقييم</button>`:""}</div>`;
+if(canReset)document.getElementById("resetReview").onclick=()=>{
+  if(isHost){
+    players[myId].reviewSubmitted=false;
+    players[myId].votes={};
+    renderReview();
+    checkReviews();
+  }else{
+    hostConn?.send({type:"REOPEN_REVIEW",from:myId});
+    renderReview();
+  }
+};
+}
+
 function checkReviews(){
 if(!isHost)return;let ps=Object.values(players);
 if(!ps.every(p=>p.reviewSubmitted)){renderHostWait();return}
@@ -206,9 +275,9 @@ function renderResults(result){
 }
 function showFinal(){phase="final";app.innerHTML=`<div class="card"><h2>🏁 النتيجة النهائية</h2>${Object.values(players).sort((a,b)=>(scores[b.id]||0)-(scores[a.id]||0)).map(p=>`<div class="result"><b>${esc(p.name)}</b> — <span class="points">${scores[p.id]||0}</span> نقطة</div>`).join("")}</div>`;broadcast({type:"FINAL",scores})}
 function handleMessage(m){
-if(m.type==="WELCOME"){hostId=m.hostId;room=m.room;players={};m.players.forEach(p=>players[p.id]={...p,conn:null});scores=m.scores||{};renderJoinLobby("تم الاتصال بالغرفة. في انتظار بدء الجولة.");return}
+if(m.type==="WELCOME"){hostId=m.hostId;room=m.room;players={};m.players.forEach(p=>players[p.id]={...p,conn:null});scores=m.scores||{};usedLetters=m.usedLetters||[];renderJoinLobby("تم الاتصال بالغرفة. في انتظار بدء الجولة.");return}
 if(m.type==="PLAYERS"){players={};m.players.forEach(p=>players[p.id]={...p,conn:null});if(phase==="lobby")renderJoinLobby("تم تحديث قائمة اللاعبين.");return}
-if(m.type==="START"){round=m.round;letter=m.letter;timerEnd=m.timerEnd;phase="play";answers=emptyAnswers();renderPlay();return}
+if(m.type==="START"){round=m.round;letter=m.letter;timerEnd=m.timerEnd;usedLetters=m.usedLetters||usedLetters;phase="play";answers=emptyAnswers();renderPlay();return}
 if(m.type==="REVIEW"){players={};m.players.forEach(p=>players[p.id]={...p,conn:null});round=m.round;letter=m.letter;phase="review";renderReview();return}
 if(m.type==="RESULTS"){scores=m.scores||scores;round=m.round;letter=m.letter;phase="results";renderResults(m.result);return}
 if(m.type==="FINAL"){scores=m.scores||scores;phase="final";renderFinalFromScores();return}
