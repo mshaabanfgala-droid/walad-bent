@@ -107,14 +107,29 @@ function createHost(){
  if(typeof Peer==="undefined"){setStatus("homeStatus","تعذر تحميل خدمة الاتصال. افتح الملف مع وجود إنترنت ثم حاول مرة أخرى.");return}
  myName=$("hostName").value.trim()||"المضيف";
  isHost=true;roomId=code();
- peer=new Peer("WB-"+roomId,{debug:0});
+ peer=new Peer("WB-"+roomId,{host:"0.peerjs.com",port:443,path:"/",secure:true,debug:0,pingInterval:5000,config:{iceServers:[{urls:"stun:stun.l.google.com:19302"}],sdpSemantics:"unified-plan"}});
  peer.on("open",()=>{addHostPlayer();$("room").textContent=roomId;show("lobby");setStatus("lobbyStatus","الغرفة جاهزة. استخدم زر مشاركة الرابط لإرسال الدعوة.","ok");$("start").classList.remove("hidden");});
  peer.on("connection",c=>{
+   peers[c.peer]=c;
    c.on("open",()=>{peers[c.peer]=c;});
    c.on("data",data=>hostMessage(c,data));
+   c.on("error",()=>{});
    c.on("close",()=>{const p=players.find(x=>x.id===c.peer);if(p)p.connected=false;renderPeople();broadcast({type:"players",players});});
  });
- peer.on("error",e=>setStatus("lobbyStatus","حصل خطأ في الاتصال: "+e.type));
+ peer.on("disconnected",()=>{
+   setStatus("lobbyStatus","الاتصال بخادم اللعبة انقطع مؤقتًا… جاري إعادة الاتصال.");
+   setTimeout(()=>{try{if(peer&&!peer.destroyed)peer.reconnect()}catch(e){}},800);
+ });
+ peer.on("error",e=>{
+   if(e.type==="network"||e.type==="socket-closed"||e.type==="socket-error"||e.type==="disconnected"){
+     setStatus("lobbyStatus","الاتصال انقطع مؤقتًا… جاري إعادة الاتصال.");
+     setTimeout(()=>{try{if(peer&&!peer.destroyed&&!peer.open)peer.reconnect()}catch(x){}},1000);
+   }else if(e.type==="unavailable-id"){
+     setStatus("lobbyStatus","كود الغرفة مستخدم بالفعل. اضغط إعادة تحميل وأنشئ غرفة جديدة.");
+   }else{
+     setStatus("lobbyStatus","حصل خطأ في الاتصال: "+e.type);
+   }
+ });
 }
 function hostMessage(c,d){
  if(d.type==="join"){
@@ -223,14 +238,53 @@ function joinGame(){
  myName=$("joinName").value.trim()||"لاعب";
  roomId=$("roomCode").value.trim().toUpperCase();
  if(!roomId){setStatus("homeStatus","اكتب كود الغرفة أولاً.");return}
- peer=new Peer({debug:0});
- peer.on("open",id=>{
-   conn=peer.connect("WB-"+roomId,{reliable:true});
-   conn.on("open",()=>{conn.send({type:"join",name:myName});setStatus("homeStatus","تم الاتصال بالغرفة.","ok");});
-   conn.on("data",remoteMessage);
-   conn.on("error",()=>setStatus("homeStatus","تعذر الاتصال بالغرفة. تأكد من الكود والإنترنت."));
+ if(!/^[A-Z0-9]{5}$/.test(roomId)){setStatus("homeStatus","كود الغرفة يجب أن يكون 5 أحرف/أرقام.");return}
+ peer=new Peer({host:"0.peerjs.com",port:443,path:"/",secure:true,debug:0,pingInterval:5000,config:{iceServers:[{urls:"stun:stun.l.google.com:19302"}],sdpSemantics:"unified-plan"}});
+ let attempts=0, done=false;
+ const connectToHost=()=>{
+   if(done||!peer||peer.destroyed)return;
+   attempts++;
+   setStatus("homeStatus",`جاري الاتصال بالغرفة… (${attempts}/8)`);
+   try{
+     if(conn){try{conn.close()}catch(e){}}
+     conn=peer.connect("WB-"+roomId,{reliable:true,serialization:"json",metadata:{name:myName}});
+     let opened=false;
+     const failTimer=setTimeout(()=>{
+       if(opened||done)return;
+       try{conn.close()}catch(e){}
+       if(attempts<8)setTimeout(connectToHost,1000);
+       else setStatus("homeStatus","تعذر الوصول للغرفة. تأكد أن صاحب الغرفة فاتح اللعبة ومتصّل بالإنترنت.");
+     },7000);
+     conn.on("open",()=>{
+       opened=true;clearTimeout(failTimer);done=true;
+       conn.send({type:"join",name:myName});
+       setStatus("homeStatus","تم الاتصال بالغرفة.","ok");
+     });
+     conn.on("data",remoteMessage);
+     conn.on("error",()=>{
+       if(!done&&attempts<8)setTimeout(connectToHost,800);
+     });
+     conn.on("close",()=>{
+       if(!done&&attempts<8)setTimeout(connectToHost,800);
+     });
+   }catch(e){
+     if(attempts<8)setTimeout(connectToHost,1000);
+   }
+ };
+ peer.on("open",()=>connectToHost());
+ peer.on("disconnected",()=>{
+   if(!done)setStatus("homeStatus","الاتصال بالخادم انقطع مؤقتًا… جاري المحاولة مرة أخرى.");
+   setTimeout(()=>{try{if(peer&&!peer.destroyed)peer.reconnect()}catch(e){}},800);
  });
- peer.on("error",e=>setStatus("homeStatus","تعذر الاتصال بالغرفة: "+e.type));
+ peer.on("error",e=>{
+   if(e.type==="peer-unavailable"||e.type==="network"||e.type==="socket-closed"||e.type==="socket-error"){
+     if(!done&&attempts<8)setTimeout(connectToHost,1000);
+   }else if(e.type==="browser-incompatible"){
+     setStatus("homeStatus","المتصفح لا يدعم اتصال اللعبة. جرّب Chrome.");
+   }else if(e.type!=="unavailable-id"){
+     setStatus("homeStatus","تعذر الاتصال بالغرفة: "+e.type);
+   }
+ });
 }
 function remoteMessage(d){
  if(d.type==="full"){setStatus("homeStatus","الغرفة ممتلئة — الحد الأقصى 6 لاعبين.");return}
