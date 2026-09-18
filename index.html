@@ -179,7 +179,7 @@ function renderHostWait(){app.innerHTML=`<div class="card"><h2>⏳ في انتظ
 function calculateResults(){
 let ps=Object.values(players),accepted={};ps.forEach(p=>accepted[p.id]={});
 CATS.forEach(([label,k])=>ps.forEach(target=>{
-let v=n(target.answers?.[k]),ok=false;
+let v=norm(target.answers?.[k]),ok=false;
 if(v&&validAnswer(target.answers?.[k])){
 let yes=0,no=0;
 ps.forEach(reviewer=>{if(reviewer.id===target.id)return;let val=reviewer.votes?.[target.id]?.[k];if(val===true)yes++;if(val===false)no++});
@@ -189,15 +189,20 @@ accepted[target.id][k]=ok;
 }));
 let result={};ps.forEach(p=>{let total=0,fields={};CATS.forEach(([label,k])=>{
 if(!accepted[p.id][k]){fields[k]=0;return}
-let v=n(p.answers?.[k]),same=ps.filter(q=>accepted[q.id][k]&&n(q.answers?.[k])===v).length;fields[k]=same===1?10:5;total+=fields[k]
+let v=norm(p.answers?.[k]),same=ps.filter(q=>accepted[q.id][k]&&norm(q.answers?.[k])===v).length;fields[k]=same===1?10:5;total+=fields[k]
 });scores[p.id]=(scores[p.id]||0)+total;result[p.id]={id:p.id,name:p.name,total,fields,answers:p.answers}});
 phase="results";renderResults(result);broadcast({type:"RESULTS",round,letter,result,scores});
 }
 function renderResults(result){
-app.innerHTML=`<div class="card"><h2>🏆 نتيجة الجولة</h2><div class="status">الحرف: <b>${esc(letter)}</b></div></div>
-${Object.values(result).map(r=>`<div class="result"><b>${esc(r.name)}</b> — <span class="points">+${r.total}</span> نقطة<br><span class="small">${CATS.map(c=>`${c[0]}: ${esc(r.answers?.[c[1]]||"—")} (${r.fields[c[1]]||0})`).join(" · ")}</span></div>`).join("")}
-${isHost?`<button id="next">${round<TOTAL_ROUNDS?"الجولة التالية ➜":"إنهاء اللعبة 🏁"}</button>`:"<div class="status">في انتظار صاحب الغرفة.</div>"}`;
-if(isHost)document.getElementById("next").onclick=()=>round<TOTAL_ROUNDS?startRound():showFinal();
+  let cards=Object.values(result).map(r=>{
+    let details=CATS.map(c=>`${c[0]}: ${esc(r.answers?.[c[1]]||"—")} (${r.fields[c[1]]||0})`).join(" · ");
+    return `<div class="result"><b>${esc(r.name)}</b> — <span class="points">+${r.total}</span> نقطة<br><span class="small">${details}</span></div>`;
+  }).join("");
+  let nextHtml=isHost
+    ? `<button id="next">${round<TOTAL_ROUNDS?"الجولة التالية ➜":"إنهاء اللعبة 🏁"}</button>`
+    : `<div class="status">في انتظار صاحب الغرفة.</div>`;
+  app.innerHTML=`<div class="card"><h2>🏆 نتيجة الجولة</h2><div class="status">الحرف: <b>${esc(letter)}</b></div></div>${cards}${nextHtml}`;
+  if(isHost)document.getElementById("next").onclick=()=>round<TOTAL_ROUNDS?startRound():showFinal();
 }
 function showFinal(){phase="final";app.innerHTML=`<div class="card"><h2>🏁 النتيجة النهائية</h2>${Object.values(players).sort((a,b)=>(scores[b.id]||0)-(scores[a.id]||0)).map(p=>`<div class="result"><b>${esc(p.name)}</b> — <span class="points">${scores[p.id]||0}</span> نقطة</div>`).join("")}</div>`;broadcast({type:"FINAL",scores})}
 function handleMessage(m){
