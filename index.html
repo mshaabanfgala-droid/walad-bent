@@ -170,96 +170,110 @@ if(!isHost||phase!=="play")return;phase="review";clearInterval(timerInt);players
 Object.values(players).forEach(p=>{p.reviewSubmitted=false;p.votes={}});renderReview();broadcast({type:"REVIEW",round,letter,players:publicPlayers(),reason});
 }
 function renderReview(){
-myVotes={};
-let others=Object.values(players).filter(p=>p.id!==myId);
-let submitted=isHost ? !!players[myId]?.reviewSubmitted : false;
+  myVotes={};
+  let others=Object.values(players).filter(p=>p.id!==myId);
 
-app.innerHTML=`<div class="card"><h2>📝 مراجعة الإجابات</h2>
-<div class="status">راجع إجابات اللاعبين الآخرين. لازم تختار <b>صح أو غلط لكل خانة</b> قبل إرسال المراجعة.</div>
-<div id="reviewProgress" class="status">0 من ${others.length*CATS.length} إجابة تم تقييمها</div></div>
-${others.map(p=>`<div class="review"><h3>🧑 ${esc(p.name)}</h3>${CATS.map(c=>`<div class="answer"><b>${c[0]}:</b> ${esc(p.answers?.[c[1]]||"—")}
-<div class="voteRow"><button class="yes" data-p="${p.id}" data-k="${c[1]}" data-v="1">✅ صح</button><button class="no" data-p="${p.id}" data-k="${c[1]}" data-v="0">❌ غلط</button></div></div>`).join("")}</div>`).join("")}
-<button id="submit">إرسال المراجعة</button>`;
+  app.innerHTML=`<div class="card">
+    <h2>📝 مراجعة الإجابات</h2>
+    <div class="status">راجع إجابات اللاعبين الآخرين. لازم تختار صح أو غلط لكل خانة.</div>
+    <div id="reviewProgress" class="status">0 من ${others.length*CATS.length} إجابة تم تقييمها</div>
+  </div>
+  ${others.map(p=>`
+    <div class="review">
+      <h3>🧑 ${esc(p.name)}</h3>
+      ${CATS.map(c=>`
+        <div class="answer">
+          <b>${c[0]}:</b> ${esc(p.answers?.[c[1]]||"—")}
+          <div class="voteRow">
+            <button type="button" class="yes" data-p="${p.id}" data-k="${c[1]}" data-v="1">✅ صح</button>
+            <button type="button" class="no" data-p="${p.id}" data-k="${c[1]}" data-v="0">❌ غلط</button>
+          </div>
+        </div>`).join("")}
+    </div>`).join("")}
+  <button id="submit" disabled>إرسال المراجعة</button>`;
 
-function refreshProgress(){
-  let done=0,total=others.length*CATS.length;
-  others.forEach(p=>{
-    CATS.forEach(c=>{
-      let k=c[1];
-      if(myVotes[p.id] && Object.prototype.hasOwnProperty.call(myVotes[p.id],k)){
-        done++;
-        let val=myVotes[p.id][k];
-        let row=document.querySelector(`[data-p="${p.id}"][data-k="${k}"]`)?.parentElement;
-        if(row){
-          row.querySelectorAll("button").forEach(x=>x.style.opacity=".45");
-          let selected=row.querySelector(`[data-v="${val?"1":"0"}"]`);
-          if(selected)selected.style.opacity="1";
+  function refreshProgress(){
+    let done=0;
+    let total=others.length*CATS.length;
+
+    others.forEach(p=>{
+      CATS.forEach(c=>{
+        let k=c[1];
+        if(myVotes[p.id] && Object.prototype.hasOwnProperty.call(myVotes[p.id],k)){
+          done++;
+          let val=myVotes[p.id][k];
+          let row=document.querySelector(`[data-p="${p.id}"][data-k="${k}"]`)?.parentElement;
+          if(row){
+            row.querySelectorAll("button").forEach(x=>x.style.opacity=".45");
+            let selected=row.querySelector(`[data-v="${val?"1":"0"}"]`);
+            if(selected)selected.style.opacity="1";
+          }
         }
-      }
+      });
     });
+
+    let pr=document.getElementById("reviewProgress");
+    if(pr)pr.textContent=`${done} من ${total} إجابة تم تقييمها`;
+
+    let submit=document.getElementById("submit");
+    if(submit){
+      submit.disabled=(done!==total);
+      submit.style.opacity=(done===total)?"1":".45";
+    }
+  }
+
+  document.querySelectorAll("[data-p]").forEach(b=>{
+    b.onclick=()=>{
+      let p=b.dataset.p;
+      let k=b.dataset.k;
+      if(!myVotes[p])myVotes[p]={};
+      myVotes[p][k]=(b.dataset.v==="1");
+      refreshProgress();
+    };
   });
-  let pr=document.getElementById("reviewProgress");
-  if(pr)pr.textContent=`${done} من ${total} إجابة تم تقييمها`;
-  let submit=document.getElementById("submit");
-  if(submit){
-    submit.disabled=(done!==total);
-    submit.style.opacity=done===total?"1":".45";
-  }
-}
 
-document.querySelectorAll("[data-p]").forEach(b=>{
-  let p=b.dataset.p,k=b.dataset.k;
-  if(myVotes[p]&&Object.prototype.hasOwnProperty.call(myVotes[p],k)){
-    done++;
-    let val=myVotes[p][k];
-    b.parentElement.querySelectorAll("button").forEach(x=>x.style.opacity=".45");
-    let selected=b.parentElement.querySelector(`[data-v="${val?"1":"0"}"]`);
-    if(selected)selected.style.opacity="1";
-  }
-});
-let pr=document.getElementById("reviewProgress");
-if(pr)pr.textContent=`${done} من ${total} إجابة تم تقييمها`;
-let submit=document.getElementById("submit");
-if(submit)submit.disabled=(done!==total);
-}
+  document.getElementById("submit").onclick=()=>{
+    let total=others.length*CATS.length;
+    let done=Object.values(myVotes).reduce((n,x)=>n+Object.keys(x).length,0);
+    if(done!==total){
+      alert("لازم تقيّم كل الإجابات أولًا.");
+      return;
+    }
 
-document.querySelectorAll("[data-p]").forEach(b=>b.onclick=()=>{
-  let p=b.dataset.p,k=b.dataset.k;
-  if(!myVotes[p])myVotes[p]={};
-  myVotes[p][k]=b.dataset.v==="1";
+    if(isHost){
+      players[myId].votes=myVotes;
+      players[myId].reviewSubmitted=true;
+      renderWaiting(true);
+      checkReviews();
+    }else{
+      hostConn?.send({type:"VOTES",from:myId,votes:myVotes});
+      renderWaiting(true);
+    }
+  };
+
   refreshProgress();
-});
+}
 
-document.getElementById("submit").onclick=()=>{
-  let total=others.length*CATS.length;
-  let done=Object.values(myVotes).reduce((n,x)=>n+Object.keys(x).length,0);
-  if(done!==total){alert("لازم تقيّم كل الإجابات أولًا.");return;}
-  if(isHost){
-    players[myId].votes=myVotes;
-    players[myId].reviewSubmitted=true;
-    renderWaiting(true);
-    checkReviews();
-  }else{
-    hostConn?.send({type:"VOTES",from:myId,votes:myVotes});
-    renderWaiting(true);
-  }
-};
-refreshProgress();
 function renderWaiting(canReset=false){
-app.innerHTML=`<div class="card"><h2>⏳ تم إرسال المراجعة</h2>
-<div class="status good">تم تقييم كل الإجابات. في انتظار باقي اللاعبين.</div>
-${canReset?`<button id="resetReview" class="alt">🔄 إعادة التقييم</button>`:""}</div>`;
-if(canReset)document.getElementById("resetReview").onclick=()=>{
-  if(isHost){
-    players[myId].reviewSubmitted=false;
-    players[myId].votes={};
-    renderReview();
-    checkReviews();
-  }else{
-    hostConn?.send({type:"REOPEN_REVIEW",from:myId});
-    renderReview();
+  app.innerHTML=`<div class="card">
+    <h2>⏳ تم إرسال المراجعة</h2>
+    <div class="status good">تم إرسال تقييمك. في انتظار باقي اللاعبين.</div>
+    ${canReset?`<button id="resetReview" class="alt">🔄 إعادة التقييم</button>`:""}
+  </div>`;
+
+  if(canReset){
+    document.getElementById("resetReview").onclick=()=>{
+      if(isHost){
+        players[myId].reviewSubmitted=false;
+        players[myId].votes={};
+        renderReview();
+        checkReviews();
+      }else{
+        hostConn?.send({type:"REOPEN_REVIEW",from:myId});
+        renderReview();
+      }
+    };
   }
-};
 }
 
 function checkReviews(){
