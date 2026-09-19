@@ -183,6 +183,26 @@ ${others.map(p=>`<div class="review"><h3>🧑 ${esc(p.name)}</h3>${CATS.map(c=>`
 
 function refreshProgress(){
 let done=0,total=others.length*CATS.length;
+others.forEach(p=>{
+  CATS.forEach(c=>{
+    let k=c[1];
+    if(myVotes[p.id] && Object.prototype.hasOwnProperty.call(myVotes[p.id],k)){
+      done++;
+      let val=myVotes[p.id][k];
+      let row=document.querySelector(`[data-p="${p.id}"][data-k="${k}"]`)?.parentElement;
+      if(row){
+        row.querySelectorAll("button").forEach(x=>x.style.opacity=".45");
+        let selected=row.querySelector(`[data-v="${val?"1":"0"}"]`);
+        if(selected)selected.style.opacity="1";
+      }
+    }
+  });
+});
+let pr=document.getElementById("reviewProgress");
+if(pr)pr.textContent=`${done} من ${total} إجابة تم تقييمها`;
+let submit=document.getElementById("submit");
+if(submit){submit.disabled=(done!==total);submit.style.opacity=done===total?"1":".45";}
+}
 document.querySelectorAll("[data-p]").forEach(b=>{
   let p=b.dataset.p,k=b.dataset.k;
   if(myVotes[p]&&Object.prototype.hasOwnProperty.call(myVotes[p],k)){
